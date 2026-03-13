@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
-import { NavLink, useLocation } from 'react-router-dom'
+import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import type { ReactNode } from 'react'
+import { useAuth } from '../contexts/AuthContext'
 
 interface LayoutProps {
   children: ReactNode
@@ -8,6 +9,8 @@ interface LayoutProps {
 
 export default function Layout({ children }: LayoutProps) {
   const location = useLocation()
+  const navigate = useNavigate()
+  const { user, logout } = useAuth()
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     try { return (localStorage.getItem('theme') as 'dark' | 'light') || 'dark' } catch { return 'dark' }
   })
@@ -100,6 +103,22 @@ export default function Layout({ children }: LayoutProps) {
             <span>{theme === 'dark' ? '☀️' : '🌙'}</span>
             {theme === 'dark' ? 'Light mode' : 'Dark mode'}
           </button>
+          {user && (
+            <div className="sidebar-user">
+              <div className="sidebar-user-info">
+                <span className="sidebar-user-name">{user.name}</span>
+                <span className="sidebar-user-role">{user.role.replace('_', ' ')}</span>
+              </div>
+              <button
+                className="btn btn-ghost btn-sm"
+                title="Sign out"
+                onClick={async () => { await logout(); navigate('/login') }}
+                style={{ padding: '4px 6px', fontSize: 14 }}
+              >
+                ⇥
+              </button>
+            </div>
+          )}
         </div>
       </aside>
       <main className="main-content">{children}</main>
