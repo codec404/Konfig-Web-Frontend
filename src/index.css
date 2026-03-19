@@ -558,6 +558,28 @@ body {
   transition: width 0.5s ease;
 }
 
+.progress-bar-fill.in-progress {
+  background: linear-gradient(90deg, var(--accent-hover), var(--accent));
+  position: relative;
+  overflow: hidden;
+}
+
+.progress-bar-fill.in-progress::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -60%;
+  width: 60%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.35), transparent);
+  animation: shimmer 1.6s linear infinite;
+}
+
+@keyframes shimmer {
+  0%   { left: -60%; }
+  100% { left: 140%; }
+}
+
 .progress-bar-fill.success {
   background: linear-gradient(90deg, #16a34a, var(--success));
 }

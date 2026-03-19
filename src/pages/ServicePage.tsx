@@ -1,15 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import ConfigList from '../components/ConfigList'
-import RolloutPanel from '../components/RolloutPanel'
-import ValidateConfig from '../components/ValidateConfig'
-
-type Tab = 'configs' | 'rollout' | 'validate'
 
 export default function ServicePage() {
   const { serviceName } = useParams<{ serviceName: string }>()
   const navigate = useNavigate()
-  const [activeTab, setActiveTab] = useState<Tab>('configs')
 
   const svc = serviceName ?? ''
 
@@ -49,33 +44,10 @@ export default function ServicePage() {
           <span className="service-badge">{svc}</span>
         </div>
         <div className="page-title">{svc}</div>
-        <div className="page-subtitle">Manage configs, rollouts, and validation for this service</div>
+        <div className="page-subtitle">Manage configs and rollouts for this service</div>
       </div>
 
-      <div className="tabs">
-        <button
-          className={`tab ${activeTab === 'configs' ? 'tab-active' : ''}`}
-          onClick={() => setActiveTab('configs')}
-        >
-          Configs
-        </button>
-        <button
-          className={`tab ${activeTab === 'rollout' ? 'tab-active' : ''}`}
-          onClick={() => setActiveTab('rollout')}
-        >
-          Rollout
-        </button>
-        <button
-          className={`tab ${activeTab === 'validate' ? 'tab-active' : ''}`}
-          onClick={() => setActiveTab('validate')}
-        >
-          Validate
-        </button>
-      </div>
-
-      {activeTab === 'configs' && <ConfigList serviceName={svc} />}
-      {activeTab === 'rollout' && <RolloutPanel serviceName={svc} />}
-      {activeTab === 'validate' && <ValidateConfig serviceName={svc} />}
+      <ConfigList serviceName={svc} />
     </div>
   )
 }

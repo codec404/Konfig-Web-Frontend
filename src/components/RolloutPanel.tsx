@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { createRollout, getRolloutStatus, rollbackConfig, promoteRollout } from '../api/rollouts'
-import { getServiceConfigs } from '../api/configs'
+import { getNamedConfigs, getConfigVersions } from '../api/configs'
 import type { RolloutStrategy, RolloutStatus } from '../api/types'
 
 interface RolloutPanelProps {
@@ -32,39 +32,62 @@ function formatDate(iso: string): string {
 
 export default function RolloutPanel({ serviceName }: RolloutPanelProps) {
   const queryClient = useQueryClient()
+
+  // Rollout form state
+  const [selectedConfigName, setSelectedConfigName] = useState('')
   const [selectedConfigId, setSelectedConfigId] = useState('')
   const [strategy, setStrategy] = useState<RolloutStrategy>('ALL_AT_ONCE')
   const [targetPct, setTargetPct] = useState(50)
+
+  // Tracking state
   const [rolloutConfigId, setRolloutConfigId] = useState<string | null>(() => {
-    try {
-      return localStorage.getItem(`rollout_tracking_${serviceName}`) || null
-    } catch { return null }
+    try { return localStorage.getItem(`rollout_tracking_${serviceName}`) || null } catch { return null }
   })
+  const [rolloutConfigName, setRolloutConfigName] = useState<string | null>(() => {
+    try { return localStorage.getItem(`rollout_tracking_name_${serviceName}`) || null } catch { return null }
+  })
+
+  // Rollback state
   const [rollbackVersion, setRollbackVersion] = useState('')
   const [promoteTarget, setPromoteTarget] = useState(100)
   const [formError, setFormError] = useState<string | null>(null)
   const [successMsg, setSuccessMsg] = useState<string | null>(null)
 
-  function trackRollout(configId: string | null) {
+  function trackRollout(configId: string | null, configName: string | null) {
     try {
       if (configId) {
         localStorage.setItem(`rollout_tracking_${serviceName}`, configId)
+        localStorage.setItem(`rollout_tracking_name_${serviceName}`, configName ?? '')
       } else {
         localStorage.removeItem(`rollout_tracking_${serviceName}`)
+        localStorage.removeItem(`rollout_tracking_name_${serviceName}`)
       }
     } catch { /* ignore */ }
     setRolloutConfigId(configId)
+    setRolloutConfigName(configName)
   }
 
-  // Fetch configs for the dropdown
-  const { data: configData } = useQuery({
-    queryKey: ['configs', serviceName, 0],
-    queryFn: () => getServiceConfigs(serviceName, 20, 0),
+  // Fetch named configs for config-name dropdown
+  const { data: namedConfigs = [] } = useQuery({
+    queryKey: ['named-configs', serviceName],
+    queryFn: () => getNamedConfigs(serviceName),
   })
 
-  const configs = configData?.configs ?? []
+  // Fetch versions when a named config is selected
+  const { data: versionsData } = useQuery({
+    queryKey: ['config-versions', serviceName, selectedConfigName, 0],
+    queryFn: () => getConfigVersions(serviceName, selectedConfigName, 20, 0),
+    enabled: !!selectedConfigName,
+  })
+  const versions = versionsData?.configs ?? []
+  const activeVersion = versions.find((v) => v.is_active)
+  // Only versions strictly newer than the active version are valid rollout targets.
+  // Older or equal versions should use rollback instead.
+  const rolloutVersions = versions.filter(
+    (v) => !activeVersion || v.version > activeVersion.version
+  )
 
-  // Poll rollout status when we have a config to track
+  // Poll rollout status
   const { data: rolloutStatus, error: statusError } = useQuery({
     queryKey: ['rollout-status', rolloutConfigId],
     queryFn: () => getRolloutStatus(rolloutConfigId!),
@@ -78,7 +101,7 @@ export default function RolloutPanel({ serviceName }: RolloutPanelProps) {
   const createMutation = useMutation({
     mutationFn: createRollout,
     onSuccess: () => {
-      trackRollout(selectedConfigId)
+      trackRollout(selectedConfigId, selectedConfigName)
       setSuccessMsg('Rollout started successfully!')
       setFormError(null)
       queryClient.invalidateQueries({ queryKey: ['rollout-status', selectedConfigId] })
@@ -90,8 +113,7 @@ export default function RolloutPanel({ serviceName }: RolloutPanelProps) {
   })
 
   const rollbackMutation = useMutation({
-    mutationFn: ({ configId, payload }: { configId: string; payload: { service_name: string; to_version: number } }) =>
-      rollbackConfig(configId, payload),
+    mutationFn: rollbackConfig,
     onSuccess: () => {
       setSuccessMsg('Rollback initiated!')
       queryClient.invalidateQueries({ queryKey: ['rollout-status', rolloutConfigId] })
@@ -129,7 +151,7 @@ export default function RolloutPanel({ serviceName }: RolloutPanelProps) {
     e.preventDefault()
     setFormError(null)
     if (!selectedConfigId) {
-      setFormError('Please select a config')
+      setFormError('Please select a config version')
       return
     }
     createMutation.mutate({
@@ -140,15 +162,16 @@ export default function RolloutPanel({ serviceName }: RolloutPanelProps) {
   }
 
   function handleRollback() {
-    if (!rolloutConfigId || !rollbackVersion) return
+    if (!rolloutConfigName || !rollbackVersion) return
     const ver = parseInt(rollbackVersion, 10)
     if (isNaN(ver) || ver < 1) {
       setFormError('Enter a valid version number')
       return
     }
     rollbackMutation.mutate({
-      configId: rolloutConfigId,
-      payload: { service_name: serviceName, to_version: ver },
+      service_name: serviceName,
+      config_name: rolloutConfigName,
+      to_version: ver,
     })
   }
 
@@ -186,22 +209,43 @@ export default function RolloutPanel({ serviceName }: RolloutPanelProps) {
         )}
 
         <form onSubmit={handleStartRollout} className="rollout-form">
-          <div className="form-group" style={{ marginBottom: 0 }}>
-            <label className="form-label">Config</label>
-            <select
-              className="select"
-              value={selectedConfigId}
-              onChange={(e) => setSelectedConfigId(e.target.value)}
-              required
-            >
-              <option value="">— Select a config —</option>
-              {configs.map((c) => (
-                <option key={c.config_id} value={c.config_id}>
-                  v{c.version} — {c.config_id.slice(0, 12)}... ({c.format}){' '}
-                  {c.is_active ? '[active]' : ''}
-                </option>
-              ))}
-            </select>
+          <div className="form-row">
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label className="form-label">Named Config</label>
+              <select
+                className="select"
+                value={selectedConfigName}
+                onChange={(e) => { setSelectedConfigName(e.target.value); setSelectedConfigId('') }}
+              >
+                <option value="">— Select a config —</option>
+                {namedConfigs.map((nc) => (
+                  <option key={nc.config_name} value={nc.config_name}>
+                    {nc.config_name} ({nc.format}) · {nc.version_count} versions
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label className="form-label">Version</label>
+              <select
+                className="select"
+                value={selectedConfigId}
+                onChange={(e) => setSelectedConfigId(e.target.value)}
+                disabled={!selectedConfigName}
+                required
+              >
+                <option value="">— Select version —</option>
+                {rolloutVersions.length === 0 && selectedConfigName && (
+                  <option value="" disabled>No newer versions to roll out</option>
+                )}
+                {rolloutVersions.map((v) => (
+                  <option key={v.config_id} value={v.config_id}>
+                    v{v.version} — {v.config_id.slice(-8)}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
           <div className="form-row">
@@ -271,7 +315,7 @@ export default function RolloutPanel({ serviceName }: RolloutPanelProps) {
               <button
                 className="btn btn-ghost"
                 style={{ fontSize: 12, padding: '2px 8px' }}
-                onClick={() => trackRollout(null)}
+                onClick={() => trackRollout(null, null)}
               >
                 Stop Tracking
               </button>
@@ -343,7 +387,7 @@ export default function RolloutPanel({ serviceName }: RolloutPanelProps) {
                 </div>
               </div>
 
-              {/* Promote section — canary/percentage rollouts in progress below 100% */}
+              {/* Promote section */}
               {rolloutStatus.status === 'IN_PROGRESS' &&
                 (rolloutStatus.strategy === 'CANARY' || rolloutStatus.strategy === 'PERCENTAGE') &&
                 rolloutStatus.target_percentage < 100 && (
@@ -352,7 +396,7 @@ export default function RolloutPanel({ serviceName }: RolloutPanelProps) {
                     Promote Canary
                   </div>
                   <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 10 }}>
-                    Currently targeting {rolloutStatus.target_percentage}% of instances. Increase to roll out further.
+                    Currently targeting {rolloutStatus.target_percentage}% of instances.
                   </div>
                   <div className="flex-center gap-2">
                     <input
@@ -374,11 +418,7 @@ export default function RolloutPanel({ serviceName }: RolloutPanelProps) {
                         promoteTarget > 100
                       }
                     >
-                      {promoteMutation.isPending ? (
-                        <><div className="spinner" /> Promoting...</>
-                      ) : (
-                        'Promote →'
-                      )}
+                      {promoteMutation.isPending ? <><div className="spinner" /> Promoting...</> : 'Promote →'}
                     </button>
                   </div>
                 </div>
@@ -405,12 +445,10 @@ export default function RolloutPanel({ serviceName }: RolloutPanelProps) {
                     <button
                       className="btn btn-danger"
                       onClick={handleRollback}
-                      disabled={rollbackMutation.isPending || !rollbackVersion}
+                      disabled={rollbackMutation.isPending || !rollbackVersion || !rolloutConfigName}
                     >
                       {rollbackMutation.isPending ? (
-                        <>
-                          <div className="spinner" /> Rolling back...
-                        </>
+                        <><div className="spinner" /> Rolling back...</>
                       ) : (
                         'Rollback'
                       )}
@@ -429,7 +467,7 @@ export default function RolloutPanel({ serviceName }: RolloutPanelProps) {
             <div className="empty-state-icon">🚀</div>
             <div className="empty-state-title">No active rollout</div>
             <div className="empty-state-desc">
-              Select a config and start a rollout to see status here.
+              Select a config version and start a rollout to see status here.
             </div>
           </div>
         </div>

@@ -27,11 +27,10 @@ export async function getRolloutStatus(configId: string): Promise<RolloutState> 
 }
 
 export async function rollbackConfig(
-  configId: string,
   payload: RollbackRequest
 ): Promise<{ success: boolean; message: string; config_id: string }> {
   const res = await apiClient.post<{ success: boolean; message: string; config_id: string }>(
-    `/api/rollouts/${encodeURIComponent(configId)}/rollback`,
+    '/api/rollbacks',
     payload
   )
   return res.data

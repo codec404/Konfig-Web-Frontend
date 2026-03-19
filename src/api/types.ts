@@ -1,6 +1,7 @@
 export interface ConfigData {
   config_id: string
   service_name: string
+  config_name: string
   version: number
   content: string
   format: string
@@ -12,12 +13,23 @@ export interface ConfigData {
 export interface ConfigMetadata {
   config_id: string
   service_name: string
+  config_name: string
   version: number
   format: string
   created_at: string
   created_by: string
   description: string
   is_active: boolean
+}
+
+export interface NamedConfigSummary {
+  service_name: string
+  config_name: string
+  format: string
+  version_count: number
+  latest_version: number
+  latest_updated_at: string
+  has_active_rollout: boolean
 }
 
 export type RolloutStrategy = 'ALL_AT_ONCE' | 'CANARY' | 'PERCENTAGE'
@@ -73,6 +85,7 @@ export interface Schema {
 
 export interface CreateConfigRequest {
   service_name: string
+  config_name: string
   content: string
   format: string
   created_by: string
@@ -88,6 +101,7 @@ export interface CreateRolloutRequest {
 
 export interface RollbackRequest {
   service_name: string
+  config_name: string
   to_version: number
 }
 

@@ -1,13 +1,21 @@
 import { apiClient } from './client'
-import type { ConfigData, ConfigMetadata, CreateConfigRequest, PaginatedConfigs } from './types'
+import type { ConfigData, ConfigMetadata, NamedConfigSummary, CreateConfigRequest, PaginatedConfigs } from './types'
 
-export async function getServiceConfigs(
+export async function getNamedConfigs(serviceName: string): Promise<NamedConfigSummary[]> {
+  const res = await apiClient.get<{ configs: NamedConfigSummary[]; success: boolean }>(
+    `/api/services/${encodeURIComponent(serviceName)}/named-configs`
+  )
+  return res.data.configs ?? []
+}
+
+export async function getConfigVersions(
   serviceName: string,
+  configName: string,
   limit = 20,
   offset = 0
 ): Promise<PaginatedConfigs> {
   const res = await apiClient.get<PaginatedConfigs>(
-    `/api/services/${encodeURIComponent(serviceName)}/configs`,
+    `/api/services/${encodeURIComponent(serviceName)}/configs/${encodeURIComponent(configName)}/versions`,
     { params: { limit, offset } }
   )
   return res.data
