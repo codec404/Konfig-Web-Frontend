@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import type { ReactNode } from 'react'
 import { useAuth } from '../contexts/AuthContext'
+import { useQuery } from '@tanstack/react-query'
+import { meApi } from '../api/orgs'
 
 interface LayoutProps {
   children: ReactNode
@@ -70,29 +72,57 @@ export default function Layout({ children }: LayoutProps) {
             <span className="nav-icon">◈</span>
             Dashboard
           </NavLink>
-          <NavLink to="/services" className={({ isActive }) => (isActive ? 'active' : '')}>
-            <span className="nav-icon">🗂️</span>
-            Services
-          </NavLink>
-          <NavLink to="/rollouts" className={({ isActive }) => (isActive ? 'active' : '')}>
-            <span className="nav-icon">🚀</span>
-            Rollouts
-          </NavLink>
-          <NavLink to="/schemas" className={({ isActive }) => (isActive ? 'active' : '')}>
-            <span className="nav-icon">⬡</span>
-            Schemas
-          </NavLink>
-          <NavLink to="/live" className={({ isActive }) => (isActive ? 'active' : '')}>
-            <span className="nav-icon">◉</span>
-            Live Updates
-          </NavLink>
 
-          <div style={{ marginTop: 16, marginBottom: 8, padding: '0 2px' }}>
-            <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.8px', color: 'var(--text-dim)', padding: '0 8px' }}>
-              Recent Services
-            </div>
-          </div>
-          <ServiceQuickLinks />
+          {user?.role === 'super_admin' ? (
+            <>
+              <NavLink to="/admin" end className={({ isActive }) => (isActive ? 'active' : '')}>
+                <span className="nav-icon">🏢</span>
+                Organizations
+              </NavLink>
+              <NavLink to="/admin/users" end className={({ isActive }) => (isActive ? 'active' : '')}>
+                <span className="nav-icon">👥</span>
+                Users
+              </NavLink>
+            </>
+          ) : (
+            <>
+              <NavLink to="/orgs" className={({ isActive }) => (isActive ? 'active' : '')}>
+                <span className="nav-icon">🏢</span>
+                Organizations
+                <InviteBadge />
+              </NavLink>
+              <NavLink to="/services" className={({ isActive }) => (isActive ? 'active' : '')}>
+                <span className="nav-icon">🗂️</span>
+                Services
+              </NavLink>
+              <NavLink to="/rollouts" className={({ isActive }) => (isActive ? 'active' : '')}>
+                <span className="nav-icon">🚀</span>
+                Rollouts
+              </NavLink>
+              <NavLink to="/schemas" className={({ isActive }) => (isActive ? 'active' : '')}>
+                <span className="nav-icon">⬡</span>
+                Schemas
+              </NavLink>
+              <NavLink to="/live" className={({ isActive }) => (isActive ? 'active' : '')}>
+                <span className="nav-icon">◉</span>
+                Live Updates
+              </NavLink>
+
+              {user?.role === 'admin' && (
+                <NavLink to="/admin" className={({ isActive }) => (isActive ? 'active' : '')}>
+                  <span className="nav-icon">⚙️</span>
+                  Admin
+                </NavLink>
+              )}
+
+              <div style={{ marginTop: 16, marginBottom: 8, padding: '0 2px' }}>
+                <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.8px', color: 'var(--text-dim)', padding: '0 8px' }}>
+                  Recent Services
+                </div>
+              </div>
+              <ServiceQuickLinks />
+            </>
+          )}
         </nav>
         <div className="sidebar-footer">
           <button
@@ -123,6 +153,26 @@ export default function Layout({ children }: LayoutProps) {
       </aside>
       <main className="main-content">{children}</main>
     </div>
+  )
+}
+
+function InviteBadge() {
+  const { data } = useQuery({
+    queryKey: ['me', 'invites'],
+    queryFn: meApi.listInvites,
+    refetchInterval: 60000,
+    staleTime: 30000,
+  })
+  const count = data?.invites?.length ?? 0
+  if (count === 0) return null
+  return (
+    <span style={{
+      marginLeft: 'auto', background: 'var(--accent)', color: '#fff',
+      borderRadius: 10, fontSize: 10, fontWeight: 700,
+      padding: '1px 6px', minWidth: 16, textAlign: 'center',
+    }}>
+      {count}
+    </span>
   )
 }
 

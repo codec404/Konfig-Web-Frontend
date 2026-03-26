@@ -1,24 +1,69 @@
 import { useState, type FormEvent } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import { authApi } from '../api/auth'
+
+type Step = 'email' | 'code'
 
 export default function LoginPage() {
-  const { login, googleLogin } = useAuth()
+  const { googleLogin, refreshUser } = useAuth()
   const navigate = useNavigate()
+
+  const [step, setStep] = useState<Step>('email')
   const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
+  const [code, setCode] = useState('')
+  const [countdown, setCountdown] = useState(0)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
-  const handleSubmit = async (e: FormEvent) => {
+  function startCountdown() {
+    setCountdown(60)
+    const interval = setInterval(() => {
+      setCountdown(c => {
+        if (c <= 1) { clearInterval(interval); return 0 }
+        return c - 1
+      })
+    }, 1000)
+  }
+
+  const handleSendOTP = async (e: FormEvent) => {
     e.preventDefault()
     setError('')
     setLoading(true)
     try {
-      await login(email, password)
+      await authApi.sendOTP(email, 'login')
+      setStep('code')
+      startCountdown()
+    } catch {
+      setError('Failed to send code. Please try again.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleResend = async () => {
+    setError('')
+    setLoading(true)
+    try {
+      await authApi.sendOTP(email, 'login')
+      startCountdown()
+    } catch {
+      setError('Failed to resend code.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleVerify = async (e: FormEvent) => {
+    e.preventDefault()
+    setError('')
+    setLoading(true)
+    try {
+      await authApi.loginWithOTP(email, code)
+      await refreshUser()
       navigate('/')
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Login failed')
+    } catch (err: any) {
+      setError(err?.response?.data?.error || 'Invalid or expired code.')
     } finally {
       setLoading(false)
     }
@@ -31,52 +76,93 @@ export default function LoginPage() {
           <img src="/konfig.svg" alt="Konfig" width={40} height={40} />
           <h1>Konfig</h1>
         </div>
-        <h2 className="auth-title">Sign in</h2>
 
-        <button className="btn btn-google" onClick={googleLogin} type="button">
-          <GoogleIcon />
-          Continue with Google
-        </button>
+        {step === 'email' && (
+          <>
+            <h2 className="auth-title">Sign in</h2>
 
-        <div className="auth-divider"><span>or</span></div>
+            <button className="btn btn-google" onClick={googleLogin} type="button">
+              <GoogleIcon />
+              Continue with Google
+            </button>
 
-        <form onSubmit={handleSubmit} className="auth-form">
-          <div className="form-group">
-            <label htmlFor="email">Email</label>
-            <input
-              id="email"
-              type="email"
-              className="form-control"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              placeholder="you@example.com"
-              required
-              autoFocus
-            />
-          </div>
-          <div className="form-group">
-            <label htmlFor="password">Password</label>
-            <input
-              id="password"
-              type="password"
-              className="form-control"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              placeholder="••••••••"
-              required
-            />
-          </div>
+            <div className="auth-divider"><span>or sign in with email</span></div>
 
-          {error && <div className="auth-error">{error}</div>}
+            <form onSubmit={handleSendOTP} className="auth-form">
+              <div className="form-group">
+                <label htmlFor="email">Email</label>
+                <input
+                  id="email"
+                  type="email"
+                  className="form-control"
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  placeholder="you@example.com"
+                  required
+                  autoFocus
+                />
+              </div>
+              {error && <div className="auth-error">{error}</div>}
+              <button className="btn btn-primary auth-submit" type="submit" disabled={loading}>
+                {loading ? <span className="spinner spinner-sm" /> : 'Send code'}
+              </button>
+            </form>
+          </>
+        )}
 
-          <button className="btn btn-primary auth-submit" type="submit" disabled={loading}>
-            {loading ? <span className="spinner spinner-sm" /> : 'Sign in'}
-          </button>
-        </form>
+        {step === 'code' && (
+          <>
+            <h2 className="auth-title">Check your email</h2>
+            <p style={{ color: 'var(--text-muted)', fontSize: 14, marginBottom: 20, textAlign: 'center' }}>
+              We sent a 6-digit code to <strong>{email}</strong>
+            </p>
 
-        <p className="auth-footer">
-          Don't have an account? <Link to="/signup">Sign up</Link>
-        </p>
+            <form onSubmit={handleVerify} className="auth-form">
+              <div className="form-group">
+                <label htmlFor="code">Verification code</label>
+                <input
+                  id="code"
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={6}
+                  className="form-control"
+                  value={code}
+                  onChange={e => setCode(e.target.value.replace(/\D/g, ''))}
+                  placeholder="123456"
+                  autoFocus
+                  required
+                  style={{ letterSpacing: '0.3em', fontSize: 20, textAlign: 'center' }}
+                />
+              </div>
+              {error && <div className="auth-error">{error}</div>}
+              <button className="btn btn-primary auth-submit" type="submit" disabled={loading}>
+                {loading ? <span className="spinner spinner-sm" /> : 'Sign in'}
+              </button>
+            </form>
+
+            <div style={{ textAlign: 'center', marginTop: 12, fontSize: 13, color: 'var(--text-muted)' }}>
+              {countdown > 0 ? `Resend in ${countdown}s` : (
+                <button
+                  className="btn btn-ghost btn-sm"
+                  onClick={handleResend}
+                  disabled={loading}
+                  style={{ fontSize: 13, padding: '2px 6px' }}
+                >
+                  Resend code
+                </button>
+              )}
+              {' · '}
+              <button
+                className="btn btn-ghost btn-sm"
+                onClick={() => { setStep('email'); setCode(''); setError('') }}
+                style={{ fontSize: 13, padding: '2px 6px' }}
+              >
+                Change email
+              </button>
+            </div>
+          </>
+        )}
+
       </div>
     </div>
   )

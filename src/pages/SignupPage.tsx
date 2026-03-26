@@ -1,28 +1,144 @@
-import { useState, type FormEvent } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useState, useEffect, type FormEvent } from 'react'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import { apiClient } from '../api/client'
+
+interface PublicOrg {
+  id: string
+  name: string
+}
+
+type Step = 'choose' | 'form'
+type AccountType = 'individual' | 'org'
 
 export default function SignupPage() {
   const { signup, googleLogin } = useAuth()
   const navigate = useNavigate()
+
+  const [step, setStep] = useState<Step>('choose')
+  const [accountType, setAccountType] = useState<AccountType>('individual')
+  const [orgs, setOrgs] = useState<PublicOrg[]>([])
+  const [orgsLoading, setOrgsLoading] = useState(false)
+
+  const [searchParams] = useSearchParams()
+
   const [name, setName] = useState('')
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
+  const [email, setEmail] = useState(searchParams.get('email') ?? '')
+  const [orgID, setOrgID] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    if (step === 'form' && accountType === 'org') {
+      setOrgsLoading(true)
+      apiClient.get<{ orgs: PublicOrg[] }>('/api/public/orgs')
+        .then(r => {
+          setOrgs(r.data.orgs)
+          if (r.data.orgs.length > 0) setOrgID(r.data.orgs[0].id)
+        })
+        .catch(() => setOrgs([]))
+        .finally(() => setOrgsLoading(false))
+    }
+  }, [step, accountType])
+
+  const handleChoose = (type: AccountType) => {
+    setAccountType(type)
+    setStep('form')
+    setError('')
+  }
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
     setError('')
+    if (accountType === 'org' && !orgID) {
+      setError('Please select an organization')
+      return
+    }
     setLoading(true)
     try {
-      await signup(name, email, password)
+      await signup({
+        name,
+        email,
+        account_type: accountType,
+        org_id: accountType === 'org' ? orgID : undefined,
+      })
       navigate('/')
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Signup failed')
+    } catch (err: any) {
+      // Email already exists — redirect to login with OTP
+      if (err?.response?.data?.error === 'already_registered') {
+        navigate('/login')
+        return
+      }
+      const msg = err?.response?.data?.error || (err instanceof Error ? err.message : 'Signup failed')
+      setError(msg)
     } finally {
       setLoading(false)
     }
+  }
+
+  if (step === 'choose') {
+    return (
+      <div className="auth-page">
+        <div className="auth-card">
+          <div className="auth-logo">
+            <img src="/konfig.svg" alt="Konfig" width={40} height={40} />
+            <h1>Konfig</h1>
+          </div>
+          <h2 className="auth-title">Create account</h2>
+          <p style={{ textAlign: 'center', color: 'var(--text-muted)', marginBottom: 24, fontSize: 14 }}>
+            Choose how you want to use Konfig
+          </p>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 24 }}>
+            <button
+              className="btn"
+              onClick={() => handleChoose('individual')}
+              style={{
+                width: '100%', padding: '16px 18px', borderRadius: 12, border: '2px solid var(--border)',
+                background: 'var(--surface)', cursor: 'pointer', textAlign: 'left',
+                display: 'flex', alignItems: 'center', gap: 16,
+                transition: 'border-color 0.15s', whiteSpace: 'normal', boxSizing: 'border-box',
+              }}
+              onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--accent)')}
+              onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--border)')}
+            >
+              <div style={{ fontSize: 28, flexShrink: 0 }}>🧑</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 2 }}>Individual</div>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.4 }}>
+                  Personal workspace. Full read/write access to your own services and configs.
+                </div>
+              </div>
+            </button>
+
+            <button
+              className="btn"
+              onClick={() => handleChoose('org')}
+              style={{
+                width: '100%', padding: '16px 18px', borderRadius: 12, border: '2px solid var(--border)',
+                background: 'var(--surface)', cursor: 'pointer', textAlign: 'left',
+                display: 'flex', alignItems: 'center', gap: 16,
+                transition: 'border-color 0.15s', whiteSpace: 'normal', boxSizing: 'border-box',
+              }}
+              onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--accent)')}
+              onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--border)')}
+            >
+              <div style={{ fontSize: 28, flexShrink: 0 }}>🏢</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 2 }}>Organization</div>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.4 }}>
+                  Join an org. Access is approved by an admin. Shared services with controlled visibility.
+                </div>
+              </div>
+            </button>
+          </div>
+
+          <p className="auth-footer">
+            Already have an account? <Link to="/login">Sign in</Link>
+          </p>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -32,59 +148,70 @@ export default function SignupPage() {
           <img src="/konfig.svg" alt="Konfig" width={40} height={40} />
           <h1>Konfig</h1>
         </div>
-        <h2 className="auth-title">Create account</h2>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+          <button
+            onClick={() => setStep('choose')}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--accent)', padding: 0, fontSize: 13 }}
+          >
+            ← Back
+          </button>
+          <h2 className="auth-title" style={{ margin: 0 }}>
+            {accountType === 'individual' ? 'Individual account' : 'Join an organization'}
+          </h2>
+        </div>
 
-        <button className="btn btn-google" onClick={googleLogin} type="button">
-          <GoogleIcon />
-          Continue with Google
-        </button>
-
-        <div className="auth-divider"><span>or</span></div>
+        {accountType === 'individual' && (
+          <>
+            <button className="btn btn-google" onClick={googleLogin} type="button">
+              <GoogleIcon />
+              Continue with Google
+            </button>
+            <div className="auth-divider"><span>or</span></div>
+          </>
+        )}
 
         <form onSubmit={handleSubmit} className="auth-form">
           <div className="form-group">
             <label htmlFor="name">Name</label>
-            <input
-              id="name"
-              type="text"
-              className="form-control"
-              value={name}
-              onChange={e => setName(e.target.value)}
-              placeholder="Your name"
-              required
-              autoFocus
-            />
+            <input id="name" type="text" className="form-control" value={name}
+              onChange={e => setName(e.target.value)} placeholder="Your name" required autoFocus />
           </div>
           <div className="form-group">
             <label htmlFor="email">Email</label>
-            <input
-              id="email"
-              type="email"
-              className="form-control"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              placeholder="you@example.com"
-              required
-            />
+            <input id="email" type="email" className="form-control" value={email}
+              onChange={e => setEmail(e.target.value)} placeholder="you@example.com" required />
           </div>
-          <div className="form-group">
-            <label htmlFor="password">Password</label>
-            <input
-              id="password"
-              type="password"
-              className="form-control"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              placeholder="Min. 8 characters"
-              minLength={8}
-              required
-            />
-          </div>
+
+          {accountType === 'org' && (
+            <div className="form-group">
+              <label htmlFor="org">Organization</label>
+              {orgsLoading ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--text-muted)' }}>
+                  <span className="spinner spinner-sm" /> Loading organizations...
+                </div>
+              ) : orgs.length === 0 ? (
+                <div className="auth-error">No organizations available. Contact your admin.</div>
+              ) : (
+                <select id="org" className="form-control" value={orgID}
+                  onChange={e => setOrgID(e.target.value)} required>
+                  {orgs.map(o => (
+                    <option key={o.id} value={o.id}>{o.name}</option>
+                  ))}
+                </select>
+              )}
+              <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
+                Your request will be reviewed by an organization admin before you can access services.
+              </p>
+            </div>
+          )}
 
           {error && <div className="auth-error">{error}</div>}
 
-          <button className="btn btn-primary auth-submit" type="submit" disabled={loading}>
-            {loading ? <span className="spinner spinner-sm" /> : 'Create account'}
+          <button className="btn btn-primary auth-submit" type="submit"
+            disabled={loading || (accountType === 'org' && (orgsLoading || orgs.length === 0))}>
+            {loading ? <span className="spinner spinner-sm" /> : (
+              accountType === 'org' ? 'Request access' : 'Create account'
+            )}
           </button>
         </form>
 

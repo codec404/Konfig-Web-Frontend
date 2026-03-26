@@ -10,14 +10,31 @@ import SchemasPage from './pages/SchemasPage'
 import LiveUpdates from './components/LiveUpdates'
 import ConfigDetailPage from './pages/ConfigDetailPage'
 import LoginPage from './pages/LoginPage'
-import SignupPage from './pages/SignupPage'
+import SuperAdminPage from './pages/SuperAdminPage'
+import AdminPage from './pages/AdminPage'
+import OrgsPage from './pages/OrgsPage'
+import OrgDashboardPage from './pages/OrgDashboardPage'
+import { useAuth } from './contexts/AuthContext'
+
+function AdminRoute() {
+  const { user } = useAuth()
+  if (!user) return null
+  if (user.role === 'super_admin') return <SuperAdminPage tab="orgs" />
+  if (user.role === 'admin') return <AdminPage />
+  return null
+}
+
+function SuperAdminUsersRoute() {
+  const { user } = useAuth()
+  if (!user || user.role !== 'super_admin') return null
+  return <SuperAdminPage tab="users" />
+}
 
 export default function App() {
   return (
     <AuthProvider>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
-        <Route path="/signup" element={<SignupPage />} />
         <Route path="/*" element={
           <ProtectedRoute>
             <Layout>
@@ -29,6 +46,10 @@ export default function App() {
                 <Route path="/rollouts" element={<RolloutsPage />} />
                 <Route path="/schemas" element={<SchemasPage />} />
                 <Route path="/live" element={<LiveUpdates />} />
+                <Route path="/admin" element={<AdminRoute />} />
+                <Route path="/admin/users" element={<SuperAdminUsersRoute />} />
+                <Route path="/orgs" element={<OrgsPage />} />
+                <Route path="/orgs/:orgId" element={<OrgDashboardPage />} />
               </Routes>
             </Layout>
           </ProtectedRoute>

@@ -5,21 +5,31 @@ export interface AuthUser {
   name: string
   email: string
   role: 'super_admin' | 'admin' | 'user'
+  account_type?: 'individual' | 'org'
+  org_id?: string
+  member_status?: 'pending' | 'approved' | 'rejected'
 }
 
 export interface AuthResponse {
   user: AuthUser
 }
 
-export const authApi = {
-  login: (email: string, password: string) =>
-    apiClient.post<AuthResponse>('/api/auth/login', { email, password }).then(r => r.data),
+export interface SignupParams {
+  name: string
+  email: string
+  account_type: 'individual' | 'org'
+  org_id?: string
+}
 
-  signup: (name: string, email: string, password: string) =>
-    apiClient.post<AuthResponse>('/api/auth/signup', { name, email, password }).then(r => r.data),
+export const authApi = {
+  signup: (params: SignupParams) =>
+    apiClient.post<AuthResponse>('/api/auth/signup', params).then(r => r.data),
 
   me: () =>
     apiClient.get<AuthUser>('/api/auth/me').then(r => r.data),
+
+  updateMe: (name?: string, password?: string) =>
+    apiClient.put<{ user: AuthUser }>('/api/me', { name, password }).then(r => r.data),
 
   logout: () =>
     apiClient.post('/api/auth/logout').then(r => r.data),
@@ -27,4 +37,11 @@ export const authApi = {
   googleLogin: () => {
     window.location.href = '/api/auth/google'
   },
+
+  // OTP-based flows
+  sendOTP: (email: string, purpose: 'login' | 'set_password') =>
+    apiClient.post<{ sent: boolean }>('/api/auth/send-otp', { email, purpose }).then(r => r.data),
+
+  loginWithOTP: (email: string, code: string) =>
+    apiClient.post<AuthResponse>('/api/auth/login-otp', { email, code }).then(r => r.data),
 }
