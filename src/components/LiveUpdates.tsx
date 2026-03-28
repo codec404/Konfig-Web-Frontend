@@ -95,31 +95,41 @@ export default function LiveUpdates() {
 
     ws.onerror = () => {
       if (ws !== wsRef.current) return
-      setError(`WebSocket error — could not connect to ${url}`)
       setConnecting(false)
       setConnected(false)
+      // onerror fires before onclose; the friendly message is set in onclose
+      // to use the close code for context. Nothing to do here.
     }
 
     ws.onclose = (e) => {
       if (ws !== wsRef.current) return
       setConnected(false)
       setConnecting(false)
-      if (e.code !== 1000) {
-        setLogs((prev) => [
-          ...prev,
-          {
-            ts: new Date().toISOString(),
-            data: { event: 'disconnected', code: e.code, reason: e.reason || 'Connection closed' },
-          },
-        ])
-        // Auto-reconnect after 3s if user hasn't manually disconnected
-        if (activeService.current) {
-          reconnectTimer.current = setTimeout(() => {
-            if (activeService.current) {
-              connectToService(activeService.current)
-            }
-          }, 3000)
-        }
+      if (e.code === 1000) return // clean disconnect, nothing to show
+
+      // Code 1006 = abnormal closure, which the browser reports when the
+      // server rejects the HTTP upgrade (e.g. 401 Unauthorised or 403 Forbidden).
+      const permissionDenied = e.code === 1006
+
+      if (permissionDenied) {
+        setError('Connection refused. You may not have permission to subscribe to this service, or the service name is invalid.')
+      }
+
+      setLogs((prev) => [
+        ...prev,
+        {
+          ts: new Date().toISOString(),
+          data: { event: 'disconnected', code: e.code, reason: e.reason || 'Connection closed' },
+        },
+      ])
+
+      // Don't auto-reconnect on server-rejected connections — retrying won't help.
+      if (!permissionDenied && activeService.current) {
+        reconnectTimer.current = setTimeout(() => {
+          if (activeService.current) {
+            connectToService(activeService.current)
+          }
+        }, 3000)
       }
     }
   }
