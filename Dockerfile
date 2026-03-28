@@ -3,6 +3,8 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci
 COPY . .
+ARG VITE_BASE_DOMAIN=localhost
+ENV VITE_BASE_DOMAIN=$VITE_BASE_DOMAIN
 RUN npm run build
 
 FROM nginx:alpine
