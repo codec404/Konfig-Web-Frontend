@@ -5,13 +5,16 @@ import { getStats, getAuditLog, listServices } from '../api/stats'
 import type { ServiceSummary } from '../api/stats'
 import { superAdminApi } from '../api/orgs'
 import { useAuth } from '../contexts/AuthContext'
+import { FileText, RotateCcw, Rocket, Trash2, Building2, Users, Ban, Layers, Hexagon, ClipboardList } from 'lucide-react'
 
-function actionIcon(action: string): string {
-  if (action.includes('upload')) return '📄'
-  if (action.includes('rollback')) return '↩️'
-  if (action.includes('rollout') || action.includes('delivered')) return '🚀'
-  if (action.includes('delet')) return '🗑️'
-  return '•'
+function ActionIcon({ action }: { action: string }) {
+  const size = 14
+  const style = { flexShrink: 0 as const }
+  if (action.includes('upload')) return <FileText size={size} style={style} />
+  if (action.includes('rollback')) return <RotateCcw size={size} style={style} />
+  if (action.includes('rollout') || action.includes('delivered')) return <Rocket size={size} style={style} />
+  if (action.includes('delet')) return <Trash2 size={size} style={style} />
+  return <span style={{ fontSize: 10, lineHeight: 1 }}>•</span>
 }
 
 function actionColor(action: string): string {
@@ -57,8 +60,13 @@ function SuperAdminDashboard() {
 
   const orgCount = orgsData?.orgs?.length ?? 0
   const userCount = usersData?.users?.length ?? 0
-  const pendingCount = usersData?.users?.filter(u => u.member_status === 'pending').length ?? 0
-  const adminCount = usersData?.users?.filter(u => u.role === 'admin').length ?? 0
+  const blockedCount = usersData?.users?.filter(u => u.blocked).length ?? 0
+  const { data: statsData } = useQuery({
+    queryKey: ['admin', 'stats'],
+    queryFn: getStats,
+    refetchInterval: 60000,
+  })
+  const totalConfigs = statsData?.total_configs ?? 0
 
   return (
     <div>
@@ -76,7 +84,7 @@ function SuperAdminDashboard() {
           onClick={() => navigate('/admin')}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
             <div className="stat-label">Organizations</div>
-            <span className="stat-icon">🏢</span>
+            <span className="stat-icon"><Building2 size={18} /></span>
           </div>
           <div className="stat-value">{orgsLoading ? <span className="stat-loading" /> : orgCount}</div>
           <div className="stat-sub">Active organizations</div>
@@ -88,7 +96,7 @@ function SuperAdminDashboard() {
         } as React.CSSProperties}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
             <div className="stat-label">Total Users</div>
-            <span className="stat-icon">👥</span>
+            <span className="stat-icon"><Users size={18} /></span>
           </div>
           <div className="stat-value">{usersLoading ? <span className="stat-loading" /> : userCount}</div>
           <div className="stat-sub">Across all orgs</div>
@@ -97,13 +105,15 @@ function SuperAdminDashboard() {
         <div className="stat-card" style={{
           '--card-color': '#f59e0b', '--card-bg': 'rgba(245,158,11,0.08)',
           '--card-shadow': 'rgba(245,158,11,0.35)', '--card-text': '#1c0a00', '--card-text-muted': '#6b3600',
-        } as React.CSSProperties}>
+          cursor: 'pointer',
+        } as React.CSSProperties}
+          onClick={() => navigate('/admin/users')}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-            <div className="stat-label">Pending Approvals</div>
-            <span className="stat-icon">⏳</span>
+            <div className="stat-label">Blocked Users</div>
+            <span className="stat-icon"><Ban size={18} /></span>
           </div>
-          <div className="stat-value">{usersLoading ? <span className="stat-loading" /> : pendingCount}</div>
-          <div className="stat-sub">Awaiting admin review</div>
+          <div className="stat-value">{usersLoading ? <span className="stat-loading" /> : blockedCount}</div>
+          <div className="stat-sub">Blocked from login</div>
         </div>
 
         <div className="stat-card" style={{
@@ -111,11 +121,11 @@ function SuperAdminDashboard() {
           '--card-shadow': 'rgba(16,185,129,0.35)', '--card-text': '#001a0d', '--card-text-muted': '#00522a',
         } as React.CSSProperties}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-            <div className="stat-label">Admins</div>
-            <span className="stat-icon">⚙️</span>
+            <div className="stat-label">Total Configs</div>
+            <span className="stat-icon"><FileText size={18} /></span>
           </div>
-          <div className="stat-value">{usersLoading ? <span className="stat-loading" /> : adminCount}</div>
-          <div className="stat-sub">Org administrators</div>
+          <div className="stat-value">{totalConfigs}</div>
+          <div className="stat-sub">Across all services</div>
         </div>
       </div>
 
@@ -216,7 +226,7 @@ function UserDashboard() {
         } as React.CSSProperties}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
             <div className="stat-label">Services</div>
-            <span className="stat-icon">🗂️</span>
+            <span className="stat-icon"><Layers size={18} /></span>
           </div>
           <div className="stat-value">
             {statsLoading ? <span className="stat-loading" /> : (stats?.total_services ?? '—')}
@@ -234,7 +244,7 @@ function UserDashboard() {
         } as React.CSSProperties}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
             <div className="stat-label">Configs</div>
-            <span className="stat-icon">📄</span>
+            <span className="stat-icon"><FileText size={18} /></span>
           </div>
           <div className="stat-value">
             {statsLoading ? <span className="stat-loading" /> : (stats?.total_configs ?? '—')}
@@ -252,7 +262,7 @@ function UserDashboard() {
         } as React.CSSProperties}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
             <div className="stat-label">Active Rollouts</div>
-            <span className="stat-icon">🚀</span>
+            <span className="stat-icon"><Rocket size={18} /></span>
           </div>
           <div className="stat-value">
             {statsLoading ? <span className="stat-loading" /> : (stats?.active_rollouts ?? '—')}
@@ -270,7 +280,7 @@ function UserDashboard() {
         } as React.CSSProperties}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
             <div className="stat-label">Schemas</div>
-            <span className="stat-icon">⬡</span>
+            <span className="stat-icon"><Hexagon size={18} /></span>
           </div>
           <div className="stat-value">
             {statsLoading ? <span className="stat-loading" /> : (stats?.total_schemas ?? '—')}
@@ -363,7 +373,7 @@ function UserDashboard() {
           </div>
         ) : auditLog.length === 0 && !auditLoading ? (
           <div className="empty-state" style={{ padding: '24px 0' }}>
-            <div className="empty-state-icon">📋</div>
+            <div className="empty-state-icon"><ClipboardList size={36} /></div>
             <div className="empty-state-title">No activity yet</div>
             <div className="empty-state-desc">Upload a config or start a rollout to see activity here.</div>
           </div>
@@ -375,7 +385,7 @@ function UserDashboard() {
                 style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '12px 0', borderBottom: '1px solid var(--border)', cursor: item.service_name ? 'pointer' : 'default' }}
                 onClick={() => item.service_name && goToService(item.service_name)}
               >
-                <span style={{ fontSize: 16, flexShrink: 0 }}>{actionIcon(item.action)}</span>
+                <span style={{ flexShrink: 0, color: actionColor(item.action), display: 'flex' }}><ActionIcon action={item.action} /></span>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
                     {item.service_name && (

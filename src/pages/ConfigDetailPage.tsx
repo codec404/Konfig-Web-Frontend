@@ -1,10 +1,13 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import { Bug } from 'lucide-react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getConfig, getConfigVersions, createConfig } from '../api/configs'
 import { rollbackConfig, createRollout } from '../api/rollouts'
 import { validateConfig } from '../api/validation'
 import type { ConfigMetadata, ValidationError, ValidationWarning } from '../api/types'
+import { useCurrentOrgId } from '../hooks/useCurrentOrgId'
+import { useOrgPermissions } from '../hooks/useOrgPermissions'
 
 function formatDate(iso: string): string {
   if (!iso) return '—'
@@ -31,6 +34,8 @@ export default function ConfigDetailPage() {
   const { serviceName, configId } = useParams<{ serviceName: string; configId: string }>()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const orgId = useCurrentOrgId()
+  const { can } = useOrgPermissions(orgId)
 
   const [rollbackTarget, setRollbackTarget] = useState<ConfigMetadata | null>(null)
   const [confirmed, setConfirmed] = useState(false)
@@ -290,7 +295,7 @@ export default function ConfigDetailPage() {
       <div className="card" style={{ marginBottom: 16 }}>
         <div className="card-header">
           <span className="card-title">Content</span>
-          {configData && !showNewVersion && (
+          {configData && !showNewVersion && can('configs.create') && (
             <button className="btn btn-primary btn-sm" onClick={handleOpenNewVersion}>
               + Create New Version
             </button>
@@ -361,7 +366,7 @@ export default function ConfigDetailPage() {
                 }}
                 onClick={() => nvValidationRan && setNvShowValidationPanel((v) => !v)}
               >
-                <span style={{ fontSize: 15 }}>🐛</span>
+                <Bug size={14} style={{ flexShrink: 0 }} />
                 <span>
                   {!nvValidationRan
                     ? 'Validation will run on save'
@@ -455,12 +460,14 @@ export default function ConfigDetailPage() {
                   <div style={{ fontSize: 13, color: 'var(--text-muted)', flex: 1 }}>
                     This version is inactive. Start a rollout to make it the active version.
                   </div>
-                  <button
-                    className="btn btn-primary btn-sm"
-                    onClick={() => setShowRolloutForm(true)}
-                  >
-                    Start Rollout →
-                  </button>
+                  {can('rollouts.manage') && (
+                    <button
+                      className="btn btn-primary btn-sm"
+                      onClick={() => setShowRolloutForm(true)}
+                    >
+                      Start Rollout →
+                    </button>
+                  )}
                 </div>
               ) : (
                 <div>
@@ -513,7 +520,7 @@ export default function ConfigDetailPage() {
       )}
 
       {/* Rollback */}
-      {showRollback && (
+      {showRollback && can('rollouts.manage') && (
         <div className="card">
           <div className="card-header">
             <span className="card-title">Rollback</span>

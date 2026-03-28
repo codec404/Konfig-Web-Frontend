@@ -4,6 +4,8 @@ import { useNavigate } from 'react-router-dom'
 import { getNamedConfigs, getConfigVersions, deleteConfig } from '../api/configs'
 import type { NamedConfigSummary, ConfigMetadata } from '../api/types'
 import UploadConfig from './UploadConfig'
+import { useCurrentOrgId } from '../hooks/useCurrentOrgId'
+import { useOrgPermissions } from '../hooks/useOrgPermissions'
 
 interface ConfigListProps {
   serviceName: string
@@ -58,6 +60,8 @@ function NamedConfigList({
 }) {
   const queryClient = useQueryClient()
   const [showCreate, setShowCreate] = useState(false)
+  const orgId = useCurrentOrgId()
+  const { can } = useOrgPermissions(orgId)
 
   const { data: configs = [], isLoading, error } = useQuery({
     queryKey: ['named-configs', serviceName],
@@ -87,9 +91,11 @@ function NamedConfigList({
         <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
           {configs.length} named config{configs.length !== 1 ? 's' : ''}
         </div>
-        <button className="btn btn-primary" onClick={() => setShowCreate(true)}>
-          + New Config
-        </button>
+        {can('configs.create') && (
+          <button className="btn btn-primary" onClick={() => setShowCreate(true)}>
+            + New Config
+          </button>
+        )}
       </div>
 
       {showCreate && (
@@ -182,6 +188,8 @@ function ConfigVersionList({
   const queryClient = useQueryClient()
   const [page, setPage] = useState(0)
   const limit = 20
+  const orgId = useCurrentOrgId()
+  const { can } = useOrgPermissions(orgId)
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['config-versions', serviceName, namedConfig.config_name, page],
@@ -281,13 +289,15 @@ function ConfigVersionList({
                   <td style={{ whiteSpace: 'nowrap', minWidth: 140 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
                       <button className="btn btn-sm" onClick={(e) => handleView(config, e)}>View</button>
-                      <button
-                        className="btn btn-sm btn-danger"
-                        onClick={(e) => handleDelete(config.config_id, e)}
-                        disabled={deleteMutation.isPending}
-                      >
-                        Delete
-                      </button>
+                      {can('configs.delete') && (
+                        <button
+                          className="btn btn-sm btn-danger"
+                          onClick={(e) => handleDelete(config.config_id, e)}
+                          disabled={deleteMutation.isPending}
+                        >
+                          Delete
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>

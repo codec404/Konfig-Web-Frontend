@@ -2,6 +2,7 @@ import { useState, useEffect, type FormEvent } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { apiClient } from '../api/client'
+import { Building2 } from 'lucide-react'
 
 interface PublicOrg {
   id: string
@@ -123,7 +124,7 @@ export default function SignupPage() {
               onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--accent)')}
               onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--border)')}
             >
-              <div style={{ fontSize: 28, flexShrink: 0 }}>🏢</div>
+              <Building2 size={24} style={{ flexShrink: 0, color: 'var(--accent)' }} />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 2 }}>Organization</div>
                 <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.4 }}>

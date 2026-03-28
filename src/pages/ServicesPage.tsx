@@ -1,7 +1,10 @@
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { listServices } from '../api/stats'
 import type { ServiceSummary } from '../api/stats'
+import UploadConfig from '../components/UploadConfig'
+import { Layers } from 'lucide-react'
 
 function formatDate(s: string): string {
   if (!s) return '—'
@@ -10,6 +13,10 @@ function formatDate(s: string): string {
 
 export default function ServicesPage() {
   const navigate = useNavigate()
+  const qc = useQueryClient()
+  const [showNew, setShowNew] = useState(false)
+  const [newServiceName, setNewServiceName] = useState('')
+  const [step, setStep] = useState<'name' | 'upload'>('name')
 
   const { data: services = [], isLoading, error } = useQuery({
     queryKey: ['services'],
@@ -26,11 +33,20 @@ export default function ServicesPage() {
     navigate(`/services/${encodeURIComponent(name)}`)
   }
 
+  function closeModal() {
+    setShowNew(false)
+    setNewServiceName('')
+    setStep('name')
+  }
+
   return (
     <div>
-      <div className="page-header">
-        <div className="page-title">Services</div>
-        <div className="page-subtitle">All services with registered configurations</div>
+      <div className="page-header" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+        <div>
+          <div className="page-title">Services</div>
+          <div className="page-subtitle">All services with registered configurations</div>
+        </div>
+        <button className="btn btn-primary" onClick={() => setShowNew(true)}>+ New Service</button>
       </div>
 
       {isLoading && (
@@ -44,9 +60,9 @@ export default function ServicesPage() {
       {!isLoading && services.length === 0 && (
         <div className="card">
           <div className="empty-state">
-            <div className="empty-state-icon">🗂️</div>
+            <div className="empty-state-icon"><Layers size={36} /></div>
             <div className="empty-state-title">No services yet</div>
-            <div className="empty-state-desc">Upload a config to register a service.</div>
+            <div className="empty-state-desc">Click "New Service" to upload your first config.</div>
           </div>
         </div>
       )}
@@ -90,6 +106,58 @@ export default function ServicesPage() {
                 ))}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {showNew && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+        }}>
+          <div style={{
+            background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 12,
+            padding: 24, width: 560, maxWidth: '95vw', maxHeight: '90vh', overflowY: 'auto',
+            boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+              <h3 style={{ margin: 0, fontSize: 16 }}>
+                {step === 'name' ? 'New Service' : `Upload Config — ${newServiceName}`}
+              </h3>
+              <button onClick={closeModal} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 18 }}>✕</button>
+            </div>
+
+            {step === 'name' ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label>Service Name</label>
+                  <input
+                    className="form-control"
+                    value={newServiceName}
+                    onChange={e => setNewServiceName(e.target.value)}
+                    placeholder="e.g. auth-service"
+                    autoFocus
+                    onKeyDown={e => e.key === 'Enter' && newServiceName.trim() && setStep('upload')}
+                  />
+                </div>
+                <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                  <button className="btn" onClick={closeModal}>Cancel</button>
+                  <button className="btn btn-primary" disabled={!newServiceName.trim()} onClick={() => setStep('upload')}>
+                    Next →
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <UploadConfig
+                serviceName={newServiceName.trim()}
+                onSuccess={() => {
+                  qc.invalidateQueries({ queryKey: ['services'] })
+                  goToService(newServiceName.trim())
+                  closeModal()
+                }}
+                onCancel={closeModal}
+              />
+            )}
           </div>
         </div>
       )}

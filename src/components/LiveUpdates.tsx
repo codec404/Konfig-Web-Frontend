@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { getOrgSlug } from '../utils/subdomain'
 
 interface LogEntry {
   ts: string
@@ -61,7 +62,8 @@ export default function LiveUpdates() {
     setServiceName(svc)
 
     const instanceId = `web-${Date.now()}`
-    const url = `${WS_BASE}/ws/subscribe/${encodeURIComponent(svc)}?instance_id=${instanceId}`
+    const orgSlug = getOrgSlug()
+    const url = `${WS_BASE}/ws/subscribe/${encodeURIComponent(svc)}?instance_id=${instanceId}${orgSlug ? `&org_slug=${encodeURIComponent(orgSlug)}` : ''}`
 
     const ws = new WebSocket(url)
     wsRef.current = ws

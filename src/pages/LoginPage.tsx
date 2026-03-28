@@ -2,12 +2,14 @@ import { useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { authApi } from '../api/auth'
+import { getOrgSlug } from '../utils/subdomain'
 
 type Step = 'email' | 'code'
 
 export default function LoginPage() {
   const { googleLogin, refreshUser } = useAuth()
   const navigate = useNavigate()
+  const orgSlug = getOrgSlug()
 
   const [step, setStep] = useState<Step>('email')
   const [email, setEmail] = useState('')
@@ -31,11 +33,12 @@ export default function LoginPage() {
     setError('')
     setLoading(true)
     try {
-      await authApi.sendOTP(email, 'login')
+      await authApi.sendOTP(email, 'login', orgSlug ?? undefined)
       setStep('code')
       startCountdown()
-    } catch {
-      setError('Failed to send code. Please try again.')
+    } catch (e: any) {
+      const msg = e?.message ?? ''
+      setError(msg || 'Failed to send code. Please try again.')
     } finally {
       setLoading(false)
     }
@@ -45,7 +48,7 @@ export default function LoginPage() {
     setError('')
     setLoading(true)
     try {
-      await authApi.sendOTP(email, 'login')
+      await authApi.sendOTP(email, 'login', orgSlug ?? undefined)
       startCountdown()
     } catch {
       setError('Failed to resend code.')

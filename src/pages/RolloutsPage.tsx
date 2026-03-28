@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { listRollouts, promoteRollout } from '../api/rollouts'
 import type { RolloutSummary } from '../api/rollouts'
+import { Rocket } from 'lucide-react'
 
 function statusClass(status: string): string {
   switch (status) {
@@ -402,7 +403,7 @@ export default function RolloutsPage() {
       {!isLoading && rollouts.length === 0 && (
         <div className="card">
           <div className="empty-state">
-            <div className="empty-state-icon">🚀</div>
+            <div className="empty-state-icon"><Rocket size={36} /></div>
             <div className="empty-state-title">No rollouts yet</div>
             <div className="empty-state-desc">Start a rollout from a service's config page.</div>
           </div>

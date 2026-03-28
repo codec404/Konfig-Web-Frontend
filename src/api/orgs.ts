@@ -4,6 +4,7 @@ export interface OrgMembership {
   id: string
   org_id: string
   org_name: string
+  slug?: string
   user_id: string
   role: 'admin' | 'user'
   status: 'invited' | 'active'
@@ -29,6 +30,7 @@ export interface Org {
   name: string
   created_by: string
   created_at: string
+  member_count: number
 }
 
 export interface OrgMember {
@@ -38,6 +40,8 @@ export interface OrgMember {
   role: 'admin' | 'user'
   member_status: 'pending' | 'approved' | 'rejected'
   joined_at: string
+  blocked: boolean
+  avatar_url?: string
 }
 
 export interface AllUser {
@@ -45,11 +49,12 @@ export interface AllUser {
   name: string
   email: string
   role: 'super_admin' | 'admin' | 'user'
-  account_type: 'individual' | 'org' | ''
   org_id: string
-  org_name: string
-  member_status: 'pending' | 'approved' | 'rejected' | ''
+  orgs: string[]
+  member_status: string
   created_at: string
+  blocked: boolean
+  avatar_url?: string
 }
 
 export interface OrgService {
@@ -88,7 +93,7 @@ export const superAdminApi = {
   listAllUsers: () =>
     apiClient.get<{ users: AllUser[] }>('/api/admin/users').then(r => r.data),
 
-  addUser: (params: { name: string; email: string; org_id: string; role: 'admin' | 'user' }) =>
+  addUser: (params: { email: string; org_id: string; role: 'admin' | 'user' }) =>
     apiClient.post('/api/admin/users', params).then(r => r.data),
 
   removeUser: (userId: string) =>
@@ -96,6 +101,15 @@ export const superAdminApi = {
 
   updateUser: (userId: string, name?: string) =>
     apiClient.put(`/api/admin/users/${userId}`, { name }).then(r => r.data),
+
+  blockUser: (userId: string) =>
+    apiClient.post(`/api/admin/users/${userId}/block`).then(r => r.data),
+
+  unblockUser: (userId: string) =>
+    apiClient.post(`/api/admin/users/${userId}/unblock`).then(r => r.data),
+
+  removeFromOrg: (orgId: string, userId: string) =>
+    apiClient.delete(`/api/admin/orgs/${orgId}/members/${userId}`).then(r => r.data),
 }
 
 // ── Org admin ─────────────────────────────────────────────────────────────────
@@ -133,6 +147,41 @@ export const orgAdminApi = {
 
   listInvites: () =>
     apiClient.get<{ invites: OrgInvite[] }>('/api/org/invites').then(r => r.data),
+
+  changeOrgMemberRole: (userId: string, role: 'admin' | 'user') =>
+    apiClient.put(`/api/org/members/${userId}/role`, { role }).then(r => r.data),
+
+  getMemberPermissions: (userId: string) =>
+    apiClient.get<{ permissions: string[] }>(`/api/org/members/${userId}/permissions`).then(r => r.data),
+
+  setMemberPermissions: (userId: string, permissions: string[]) =>
+    apiClient.put(`/api/org/members/${userId}/permissions`, { permissions }).then(r => r.data),
+}
+
+// ── Bug reports ───────────────────────────────────────────────────────────────
+
+export interface BugReport {
+  id: string
+  user_id: string
+  user_email: string
+  issue_type: string
+  title: string
+  description: string
+  status: string
+  created_at: string
+}
+
+export const bugApi = {
+  submit: (issue_type: string, title: string, description: string) =>
+    apiClient.post('/api/bugs', { issue_type, title, description }).then(r => r.data),
+}
+
+export const bugAdminApi = {
+  list: () =>
+    apiClient.get<{ reports: BugReport[] }>('/api/admin/bugs').then(r => r.data),
+
+  updateStatus: (reportId: string, status: string) =>
+    apiClient.put(`/api/admin/bugs/${reportId}/status`, { status }).then(r => r.data),
 }
 
 // ── Me: orgs & invites ────────────────────────────────────────────────────────
@@ -156,4 +205,7 @@ export const meApi = {
 export const orgApi = {
   getServices: (orgId: string) =>
     apiClient.get<{ services: OrgService[]; org_id: string; role: string }>(`/api/orgs/${orgId}/services`).then(r => r.data),
+
+  getMyPermissions: (orgId: string) =>
+    apiClient.get<{ permissions: string[]; is_admin: boolean }>(`/api/orgs/${orgId}/my-permissions`).then(r => r.data),
 }

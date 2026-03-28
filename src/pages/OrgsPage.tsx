@@ -1,6 +1,8 @@
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { meApi, type OrgInvite, type OrgMembership } from '../api/orgs'
+import { getOrgSubdomainUrl } from '../utils/subdomain'
+import { Building2 } from 'lucide-react'
 
 export default function OrgsPage() {
   return (
@@ -104,8 +106,8 @@ function MyOrgsSection() {
       </div>
       {orgs.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text-muted)', fontSize: 14 }}>
-          <div style={{ fontSize: 40, marginBottom: 12 }}>🏢</div>
-          You are not part of any organization yet.<br />
+          <Building2 size={36} style={{ marginBottom: 12, opacity: 0.4 }} />
+          <div>You are not part of any organization yet.</div>
           <span style={{ fontSize: 12 }}>Ask your admin to invite you.</span>
         </div>
       ) : (
@@ -113,7 +115,14 @@ function MyOrgsSection() {
           {orgs.map(org => (
             <div
               key={org.org_id}
-              onClick={() => navigate(`/orgs/${org.org_id}`)}
+              onClick={() => {
+                const slug = org.slug
+                if (slug) {
+                  window.location.href = getOrgSubdomainUrl(slug)
+                } else {
+                  navigate(`/orgs/${org.org_id}`)
+                }
+              }}
               style={{
                 padding: '16px 18px', border: '1px solid var(--border)', borderRadius: 10,
                 background: 'var(--surface)', cursor: 'pointer', transition: 'border-color 0.15s',
@@ -125,8 +134,9 @@ function MyOrgsSection() {
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span style={{
                   padding: '2px 8px', borderRadius: 4, fontSize: 11, fontWeight: 600,
-                  background: org.role === 'admin' ? 'rgba(99,102,241,0.15)' : 'var(--surface-2, #222)',
+                  background: org.role === 'admin' ? 'rgba(99,102,241,0.15)' : 'var(--surface-2)',
                   color: org.role === 'admin' ? 'var(--accent)' : 'var(--text-muted)',
+                  border: org.role === 'admin' ? '1px solid rgba(99,102,241,0.3)' : '1px solid var(--border)',
                 }}>
                   {org.role}
                 </span>

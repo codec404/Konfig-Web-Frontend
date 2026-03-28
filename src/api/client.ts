@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { getOrgSlug } from '../utils/subdomain'
 
 const API_BASE = import.meta.env.VITE_API_URL || ''
 
@@ -19,6 +20,10 @@ export const apiClient = axios.create({
 apiClient.interceptors.request.use((config) => {
   if (activeOrgId) {
     config.headers['X-Org-ID'] = activeOrgId
+  }
+  const orgSlug = getOrgSlug()
+  if (orgSlug && !activeOrgId) {
+    config.headers['X-Org-Slug'] = orgSlug
   }
   return config
 })
