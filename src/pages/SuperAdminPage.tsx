@@ -1,13 +1,15 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { superAdminApi, bugAdminApi, type Org, type OrgMember, type AllUser, type OrgService, type BugReport } from '../api/orgs'
-import { Bug } from 'lucide-react'
+import { logsAdminApi, type AppLog } from '../api/logs'
+import { Bug, ScrollText } from 'lucide-react'
 
-type Tab = 'orgs' | 'users' | 'bugs'
+type Tab = 'orgs' | 'users' | 'bugs' | 'logs'
 
 export default function SuperAdminPage({ tab }: { tab: Tab }) {
   if (tab === 'users') return <UsersTab />
   if (tab === 'bugs') return <BugReportsTab />
+  if (tab === 'logs') return <LogsTab />
   return <OrgsTab />
 }
 
@@ -728,6 +730,249 @@ function RoleBadge({ role }: { role: string }) {
     <span style={{ padding: '2px 8px', borderRadius: 4, fontSize: 11, fontWeight: 600, color, background: bg }}>
       {role.replace('_', ' ')}
     </span>
+  )
+}
+
+// ── Logs tab ──────────────────────────────────────────────────────────────────
+
+const LEVEL_STYLES: Record<string, { color: string; bg: string; border: string }> = {
+  debug: { color: 'var(--text-muted)',  bg: 'var(--surface-2)',          border: 'var(--border)' },
+  info:  { color: '#60a5fa',            bg: 'rgba(96,165,250,0.1)',       border: 'rgba(96,165,250,0.3)' },
+  warn:  { color: '#f59e0b',            bg: 'rgba(245,158,11,0.1)',       border: 'rgba(245,158,11,0.3)' },
+  error: { color: '#ef4444',            bg: 'rgba(239,68,68,0.1)',        border: 'rgba(239,68,68,0.3)' },
+}
+
+const TIME_PRESETS = [
+  { label: '1h',  ms: 60 * 60 * 1000 },
+  { label: '6h',  ms: 6 * 60 * 60 * 1000 },
+  { label: '24h', ms: 24 * 60 * 60 * 1000 },
+  { label: '3d',  ms: 3 * 24 * 60 * 60 * 1000 },
+]
+
+const PAGE_SIZE = 100
+
+function LogsTab() {
+  const qc = useQueryClient()
+  const [source, setSource] = useState('all')
+  const [level, setLevel]   = useState('all')
+  const [preset, setPreset] = useState('1h')
+  const [offset, setOffset] = useState(0)
+  const [expandedId, setExpandedId] = useState<number | null>(null)
+
+  const from = new Date(Date.now() - (TIME_PRESETS.find(p => p.label === preset)?.ms ?? 3600000)).toISOString()
+
+  const { data, isLoading, refetch, isFetching } = useQuery({
+    queryKey: ['admin', 'logs', source, level, preset, offset],
+    queryFn: () => logsAdminApi.list({ source, level, from, limit: PAGE_SIZE, offset }),
+    refetchInterval: 10000,
+  })
+
+  const { data: settingsData } = useQuery({
+    queryKey: ['admin', 'logs', 'settings'],
+    queryFn: logsAdminApi.getSettings,
+  })
+
+  const enabledLevels: string[] = settingsData?.levels ?? ['info', 'error', 'warn']
+
+  const updateSettings = useMutation({
+    mutationFn: (levels: string[]) => logsAdminApi.setSettings(levels),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin', 'logs', 'settings'] }),
+  })
+
+  function toggleLevel(lvl: 'debug' | 'warn') {
+    const next = enabledLevels.includes(lvl)
+      ? enabledLevels.filter(l => l !== lvl)
+      : [...enabledLevels, lvl]
+    updateSettings.mutate(next)
+  }
+
+  const logs: AppLog[] = data?.logs ?? []
+  const total = data?.total ?? 0
+  const totalPages = Math.ceil(total / PAGE_SIZE)
+  const page = Math.floor(offset / PAGE_SIZE) + 1
+
+  function changePreset(p: string) { setPreset(p); setOffset(0) }
+  function changeSource(s: string) { setSource(s); setOffset(0) }
+  function changeLevel(l: string)  { setLevel(l);  setOffset(0) }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', flex: '1 1 0', minHeight: 0 }}>
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+          <ScrollText size={18} style={{ color: 'var(--text-muted)' }} />
+          <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>Logs</h1>
+          {isFetching && <div className="spinner" style={{ width: 14, height: 14, marginLeft: 4 }} />}
+        </div>
+        <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: 13 }}>
+          {total.toLocaleString()} entr{total === 1 ? 'y' : 'ies'} · backend + frontend · last 3 days max
+        </p>
+      </div>
+
+      {/* Filters row */}
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 10, alignItems: 'center' }}>
+        {/* Time preset */}
+        <div style={{ display: 'flex', border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
+          {TIME_PRESETS.map(p => (
+            <button key={p.label} onClick={() => changePreset(p.label)} style={{
+              padding: '5px 12px', fontSize: 12, fontWeight: 600, border: 'none', cursor: 'pointer',
+              background: preset === p.label ? 'var(--accent)' : 'var(--surface)',
+              color: preset === p.label ? '#fff' : 'var(--text-muted)',
+              borderRight: '1px solid var(--border)',
+            }}>{p.label}</button>
+          ))}
+        </div>
+
+        {/* Source */}
+        <select className="form-control" value={source} onChange={e => changeSource(e.target.value)}
+          style={{ fontSize: 12, padding: '5px 10px', width: 130 }}>
+          <option value="all">All sources</option>
+          <option value="backend">Backend</option>
+          <option value="frontend">Frontend</option>
+        </select>
+
+        {/* Level */}
+        <select className="form-control" value={level} onChange={e => changeLevel(e.target.value)}
+          style={{ fontSize: 12, padding: '5px 10px', width: 130 }}>
+          <option value="all">All levels</option>
+          <option value="debug">Debug</option>
+          <option value="info">Info</option>
+          <option value="warn">Warn</option>
+          <option value="error">Error</option>
+        </select>
+
+        <button className="btn btn-sm" onClick={() => refetch()} style={{ marginLeft: 'auto' }}>
+          Refresh
+        </button>
+      </div>
+
+      {/* Store level settings row */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16,
+        padding: '8px 14px', borderRadius: 8, background: 'var(--surface-2)', border: '1px solid var(--border)' }}>
+        <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, whiteSpace: 'nowrap' }}>
+          Store levels:
+        </span>
+        {(['debug', 'info', 'warn', 'error'] as const).map(lvl => {
+          const always = lvl === 'info' || lvl === 'error'
+          const on = always || enabledLevels.includes(lvl)
+          const ls = LEVEL_STYLES[lvl]
+          return (
+            <button key={lvl} disabled={always} onClick={() => !always && toggleLevel(lvl as 'debug' | 'warn')}
+              title={always ? `${lvl} is always stored` : `Click to ${on ? 'disable' : 'enable'} ${lvl} storage`}
+              style={{
+                padding: '3px 12px', borderRadius: 5, fontSize: 12, fontWeight: 700,
+                cursor: always ? 'default' : 'pointer',
+                border: `1px solid ${on ? ls.border : 'var(--border)'}`,
+                background: on ? ls.bg : 'var(--surface)',
+                color: on ? ls.color : 'var(--text-dim)',
+                opacity: always ? 0.55 : 1,
+                transition: 'all 0.15s',
+              }}>
+              {on && !always ? '● ' : always ? '' : '○ '}{lvl}
+            </button>
+          )
+        })}
+        <span style={{ fontSize: 11, color: 'var(--text-dim)', marginLeft: 4 }}>
+          · info &amp; error are always stored
+        </span>
+      </div>
+
+      <div className="card" style={{ padding: 0, overflow: 'hidden', flex: '1 1 0', minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+        {isLoading ? (
+          <div className="spinner" style={{ margin: '40px auto' }} />
+        ) : logs.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--text-muted)', fontSize: 13 }}>
+            No logs in this time range.
+          </div>
+        ) : (
+          <div style={{ flex: '1 1 0', minHeight: 0, overflowY: 'auto', overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid var(--border)', background: 'var(--surface-2)' }}>
+                  {['Time', 'Source', 'Level', 'Message', 'Context'].map(h => (
+                    <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600,
+                      fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-dim)',
+                      whiteSpace: 'nowrap' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {logs.map(l => {
+                  const ls = LEVEL_STYLES[l.level] ?? LEVEL_STYLES.info
+                  const isExpanded = expandedId === l.id
+                  return (
+                    <>
+                      <tr key={l.id}
+                        onClick={() => setExpandedId(isExpanded ? null : l.id)}
+                        style={{ borderBottom: isExpanded ? 'none' : '1px solid var(--border)', cursor: 'pointer',
+                          background: isExpanded ? 'var(--surface-2)' : undefined }}
+                      >
+                        <td style={{ padding: '8px 12px', whiteSpace: 'nowrap', color: 'var(--text-dim)', fontFamily: 'var(--font-mono)' }}>
+                          {new Date(l.created_at).toLocaleString()}
+                        </td>
+                        <td style={{ padding: '8px 12px' }}>
+                          <span style={{ padding: '1px 6px', borderRadius: 4, fontSize: 10, fontWeight: 700,
+                            background: l.source === 'backend' ? 'rgba(99,102,241,0.12)' : 'rgba(16,185,129,0.12)',
+                            color: l.source === 'backend' ? 'var(--accent)' : '#34d399',
+                            border: `1px solid ${l.source === 'backend' ? 'rgba(99,102,241,0.3)' : 'rgba(16,185,129,0.3)'}`,
+                          }}>{l.source}</span>
+                        </td>
+                        <td style={{ padding: '8px 12px' }}>
+                          <span style={{ padding: '1px 6px', borderRadius: 4, fontSize: 10, fontWeight: 700,
+                            background: ls.bg, color: ls.color, border: `1px solid ${ls.border}` }}>
+                            {l.level}
+                          </span>
+                        </td>
+                        <td style={{ padding: '8px 12px', maxWidth: 400, overflow: 'hidden',
+                          textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--text)' }}>
+                          {l.message}
+                        </td>
+                        <td style={{ padding: '8px 12px', maxWidth: 320, overflow: 'hidden',
+                          textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--text-muted)',
+                          fontFamily: 'var(--font-mono)', fontSize: 11 }}>
+                          {l.context ? JSON.stringify(l.context) : '—'}
+                        </td>
+                      </tr>
+                      {isExpanded && (
+                        <tr key={`${l.id}-exp`} style={{ borderBottom: '1px solid var(--border)', background: 'var(--surface-2)' }}>
+                          <td colSpan={5} style={{ padding: '0 16px 14px' }}>
+                            <div style={{ fontSize: 12, color: 'var(--text)', marginBottom: l.context ? 8 : 0,
+                              wordBreak: 'break-all', lineHeight: 1.5 }}>
+                              <span style={{ fontWeight: 600, color: 'var(--text-muted)', marginRight: 8 }}>Message</span>
+                              {l.message}
+                            </div>
+                            {l.context && (
+                              <pre style={{ margin: 0, padding: '10px 12px', borderRadius: 6, fontSize: 11,
+                                background: 'var(--surface)', border: '1px solid var(--border)',
+                                fontFamily: 'var(--font-mono)', color: 'var(--text-muted)',
+                                overflowX: 'auto', lineHeight: 1.6 }}>
+                                {JSON.stringify(l.context, null, 2)}
+                              </pre>
+                            )}
+                          </td>
+                        </tr>
+                      )}
+                    </>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8,
+          padding: '10px 16px', borderTop: '1px solid var(--border)', flexShrink: 0,
+          background: 'var(--surface)' }}>
+          <span style={{ fontSize: 12, color: 'var(--text-muted)', marginRight: 'auto' }}>
+            {total.toLocaleString()} entr{total === 1 ? 'y' : 'ies'}
+            {totalPages > 1 && ` · Page ${page} of ${totalPages}`}
+          </span>
+          <button className="btn btn-sm" disabled={offset === 0}
+            onClick={() => setOffset(o => Math.max(0, o - PAGE_SIZE))}>‹ Prev</button>
+          <button className="btn btn-sm" disabled={offset + PAGE_SIZE >= total}
+            onClick={() => setOffset(o => o + PAGE_SIZE)}>Next ›</button>
+        </div>
+      </div>
+    </div>
   )
 }
 

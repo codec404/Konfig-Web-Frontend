@@ -36,6 +36,12 @@ function SuperAdminBugsRoute() {
   return <SuperAdminPage tab="bugs" />
 }
 
+function SuperAdminLogsRoute() {
+  const { user } = useAuth()
+  if (!user || user.role !== 'super_admin') return null
+  return <SuperAdminPage tab="logs" />
+}
+
 export default function App() {
   const orgSlug = getOrgSlug()
 
@@ -69,6 +75,7 @@ export default function App() {
                   <Route path="/admin" element={<AdminRoute />} />
                   <Route path="/admin/users" element={<SuperAdminUsersRoute />} />
                   <Route path="/admin/bugs" element={<SuperAdminBugsRoute />} />
+                  <Route path="/admin/logs" element={<SuperAdminLogsRoute />} />
                   <Route path="/orgs" element={<OrgsPage />} />
                   <Route path="/orgs/:orgId" element={<OrgDashboardPage />} />
                   <Route path="/profile" element={<ProfilePage />} />

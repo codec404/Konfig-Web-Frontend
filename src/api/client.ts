@@ -1,5 +1,6 @@
 import axios from 'axios'
 import { getOrgSlug } from '../utils/subdomain'
+import { logger } from '../lib/logger'
 
 const API_BASE = import.meta.env.VITE_API_URL || ''
 
@@ -31,11 +32,20 @@ apiClient.interceptors.request.use((config) => {
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
+    const status: number | undefined = error.response?.status
     const message =
       error.response?.data?.message ||
       error.response?.data?.error ||
       error.message ||
       'An unexpected error occurred'
+    if (status && status !== 401) {
+      logger.error('api error', {
+        status,
+        url: error.config?.url,
+        method: error.config?.method,
+        message,
+      })
+    }
     return Promise.reject(new Error(message))
   }
 )

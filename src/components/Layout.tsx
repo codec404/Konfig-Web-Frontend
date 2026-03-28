@@ -8,7 +8,7 @@ import { getOrgSlug, getMainDomainUrl } from '../utils/subdomain'
 import {
   LayoutDashboard, Layers, Rocket, GitBranch, Activity,
   Users, Building2, Bug, ChevronRight, Sun, Moon,
-  LogOut, Menu, CheckCircle2, X, AlertCircle,
+  LogOut, Menu, CheckCircle2, X, AlertCircle, ScrollText,
 } from 'lucide-react'
 
 interface LayoutProps {
@@ -147,6 +147,10 @@ export default function Layout({ children }: LayoutProps) {
               <NavLink to="/admin/bugs" end className={({ isActive }) => (isActive ? 'active' : '')}>
                 <span className="nav-icon"><Bug size={iconSize} /></span>
                 Issue Reports
+              </NavLink>
+              <NavLink to="/admin/logs" end className={({ isActive }) => (isActive ? 'active' : '')}>
+                <span className="nav-icon"><ScrollText size={iconSize} /></span>
+                Logs
               </NavLink>
             </>
           ) : (

@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { authApi } from '../api/auth'
 import type { AuthUser } from '../api/auth'
+import { logger } from '../lib/logger'
 
 interface AuthContextType {
   user: AuthUser | null
@@ -35,6 +36,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = async () => {
     await authApi.logout()
+    logger.info('user logout')
     setUser(null)
   }
 

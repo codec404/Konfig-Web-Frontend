@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { authApi } from '../api/auth'
 import { getOrgSlug } from '../utils/subdomain'
+import { logger } from '../lib/logger'
 
 type Step = 'email' | 'code'
 
@@ -63,9 +64,11 @@ export default function LoginPage() {
     setLoading(true)
     try {
       await authApi.loginWithOTP(email, code)
+      logger.info('user login', { email, method: 'otp' })
       await refreshUser()
       navigate('/')
     } catch (err: any) {
+      logger.warn('otp login failed', { email })
       setError(err?.response?.data?.error || 'Invalid or expired code.')
     } finally {
       setLoading(false)
