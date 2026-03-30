@@ -1213,24 +1213,100 @@ body {
 .auth-logo {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-bottom: 24px;
+  justify-content: center;
+  gap: 0;
+  margin-bottom: 28px;
+}
+
+.auth-logo img {
+  margin-right: 1px;
 }
 
 .auth-logo h1 {
-  font-size: 22px;
+  font-size: 34px;
   font-weight: 700;
-  background: linear-gradient(135deg, var(--accent), var(--accent-hover));
+  background: linear-gradient(135deg, #a78bfa, #818cf8);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   margin: 0;
+  letter-spacing: 0.5px;
 }
 
 .auth-title {
-  font-size: 20px;
-  font-weight: 600;
+  font-size: 22px;
+  font-weight: 700;
   color: var(--text-primary);
   margin: 0 0 20px;
+}
+
+.auth-method-tabs {
+  position: relative;
+  display: flex;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 4px;
+  gap: 0;
+  margin-bottom: 20px;
+}
+
+.auth-tab-slider {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: calc(50% - 4px);
+  height: calc(100% - 8px);
+  background: rgba(255,255,255,0.12);
+  border-radius: 999px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: none;
+}
+
+.auth-tab-slider.slide-right {
+  transform: translateX(100%);
+}
+
+.auth-method-tab {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 500;
+  border: none;
+  cursor: pointer;
+  transition: color 0.25s ease;
+  background: transparent;
+  color: var(--text-muted);
+  position: relative;
+  z-index: 1;
+}
+
+.auth-method-tab.active {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.input-icon-wrap {
+  position: relative;
+}
+
+.input-icon-wrap .input-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-dim);
+  pointer-events: none;
+  display: flex;
+}
+
+.input-icon-wrap .form-control {
+  padding-left: 36px;
 }
 
 .btn-google {

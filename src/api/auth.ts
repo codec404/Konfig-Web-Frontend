@@ -46,4 +46,14 @@ export const authApi = {
 
   loginWithOTP: (email: string, code: string) =>
     apiClient.post<AuthResponse>('/api/auth/login-otp', { email, code }).then(r => r.data),
+
+  // TOTP-based flows
+  totpInit: (email: string) =>
+    apiClient.post<
+      { enrolled: true } |
+      { enrolled: false; qr: string; secret: string }
+    >('/api/auth/totp-init', { email }).then(r => r.data),
+
+  totpLogin: (email: string, code: string, secret?: string) =>
+    apiClient.post<AuthResponse>('/api/auth/totp-login', { email, code, secret }).then(r => r.data),
 }
