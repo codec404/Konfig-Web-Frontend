@@ -97,7 +97,10 @@ export default function Layout({ children }: LayoutProps) {
 
       <aside className={`sidebar${sidebarOpen ? ' sidebar-open' : ''}`}>
         <div className="sidebar-logo">
-          <h1>Konfig</h1>
+          <div className="sidebar-logo-mark">
+            <img src="/konfig.svg" alt="K" width={28} height={28} />
+            <h1>onfig</h1>
+          </div>
           <p>Configuration Management</p>
         </div>
 

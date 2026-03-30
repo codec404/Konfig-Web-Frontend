@@ -145,14 +145,25 @@ body {
   flex-shrink: 0;
 }
 
+.sidebar-logo-mark {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.sidebar-logo-mark img {
+  margin-right: -2px;
+}
+
 .sidebar-logo h1 {
   font-size: 17px;
   font-weight: 700;
-  background: linear-gradient(135deg, var(--accent), var(--accent-hover));
+  background: linear-gradient(135deg, #a78bfa, #818cf8);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-  letter-spacing: -0.4px;
+  letter-spacing: 0.5px;
+  margin: 0;
 }
 
 .sidebar-logo p {
