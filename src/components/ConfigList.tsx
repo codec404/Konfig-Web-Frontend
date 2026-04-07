@@ -61,7 +61,8 @@ function NamedConfigList({
   const queryClient = useQueryClient()
   const [showCreate, setShowCreate] = useState(false)
   const orgId = useCurrentOrgId()
-  const { can } = useOrgPermissions(orgId)
+  const { can: orgCan } = useOrgPermissions(orgId)
+  const can = (perm: string) => !orgId || orgCan(perm)
 
   const { data: configs = [], isLoading, error } = useQuery({
     queryKey: ['named-configs', serviceName],
@@ -189,7 +190,8 @@ function ConfigVersionList({
   const [page, setPage] = useState(0)
   const limit = 20
   const orgId = useCurrentOrgId()
-  const { can } = useOrgPermissions(orgId)
+  const { can: orgCan } = useOrgPermissions(orgId)
+  const can = (perm: string) => !orgId || orgCan(perm)
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['config-versions', serviceName, namedConfig.config_name, page],

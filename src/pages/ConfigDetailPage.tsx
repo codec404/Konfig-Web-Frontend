@@ -35,7 +35,8 @@ export default function ConfigDetailPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const orgId = useCurrentOrgId()
-  const { can } = useOrgPermissions(orgId)
+  const { can: orgCan } = useOrgPermissions(orgId)
+  const can = (perm: string) => !orgId || orgCan(perm)
 
   const [rollbackTarget, setRollbackTarget] = useState<ConfigMetadata | null>(null)
   const [confirmed, setConfirmed] = useState(false)
